@@ -3,117 +3,108 @@
   Ported to Arduino ESP32 by Evandro Copercini
   updated by chegewara and MoThunderz
 */
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+#include <NimBLEDevice.h>
 
-BLEServer* pServer = NULL;
-BLECharacteristic* pCharacteristic = NULL;
-BLECharacteristic* pCharacteristic_2 = NULL;
-BLEDescriptor *pDescr;
-BLE2902 *pBLE2902;
+NimBLEServer* pServer = nullptr;
+NimBLECharacteristic* pCharacteristic = nullptr;
+NimBLECharacteristic* pCharacteristic_2 = nullptr;
 
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 uint32_t value = 0;
 
-// See the following for generating UUIDs:
-// https://www.uuidgenerator.net/
-
+// UUIDs
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHAR1_UUID          "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 #define CHAR2_UUID          "e3223119-9445-4e96-a4a1-85358c4046a2"
 
-class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
-      deviceConnected = true;
+class MyServerCallbacks: public NimBLEServerCallbacks {
+    void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override {
+        deviceConnected = true;
+        Serial.println("Cliente conectado!");
     };
 
-    void onDisconnect(BLEServer* pServer) {
-      deviceConnected = false;
+    void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override {
+        deviceConnected = false;
+        Serial.println("Cliente desconectado!");
     }
 };
 
-class CharacteristicCallBack: public BLECharacteristicCallbacks {
-  void onWrite(BLECharacteristic *pChar) override { 
-    String pChar2_value_string = pChar->getValue();                // This part is updated slightly from the video
-    int pChar2_value_int = pChar2_value_string.toInt();
-    Serial.println("pChar2: " + String(pChar2_value_int)); 
-  }
+class CharacteristicCallBack: public NimBLECharacteristicCallbacks {
+    void onWrite(NimBLECharacteristic* pChar, NimBLEConnInfo& connInfo) override {
+        std::string rxValue = pChar->getValue();
+        if (!rxValue.empty()) {
+            String valueStr = String(rxValue.c_str());
+            int intValue = valueStr.toInt();
+            Serial.print("Char2 escrito: ");
+            Serial.println(intValue);
+        }
+    }
 };
 
 void setup() {
-  Serial.begin(115200);
+    Serial.begin(115200);
+    Serial.println("Iniciando NimBLE...");
 
-  // Create the BLE Device
-  BLEDevice::init("ESP32");
+    // Inicializar NimBLE
+    NimBLEDevice::init("ESP32-NimBLE");
+    NimBLEDevice::setPower(ESP_PWR_LVL_P7); // potencia máxima
+    NimBLEDevice::setSecurityAuth(true, true, true);
 
-  // Create the BLE Server
-  pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
+    // Crear servidor
+    pServer = NimBLEDevice::createServer();
+    pServer->setCallbacks(new MyServerCallbacks());
 
-  // Create the BLE Service
-  BLEService *pService = pServer->createService(SERVICE_UUID);
+    // Crear servicio
+    NimBLEService* pService = pServer->createService(SERVICE_UUID);
 
-  // Create a BLE Characteristic
-  pCharacteristic = pService->createCharacteristic(
-                      CHAR1_UUID,
-                      BLECharacteristic::PROPERTY_NOTIFY
-                    );                   
+    // Característica de notificación
+    pCharacteristic = pService->createCharacteristic(
+        CHAR1_UUID,
+        NIMBLE_PROPERTY::NOTIFY
+    );
 
-  pCharacteristic_2 = pService->createCharacteristic(
-                      CHAR2_UUID,
-                      BLECharacteristic::PROPERTY_READ   |
-                      BLECharacteristic::PROPERTY_WRITE  
-                    );  
+    // Característica de lectura/escritura
+    pCharacteristic_2 = pService->createCharacteristic(
+        CHAR2_UUID,
+        NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE
+    );
+    pCharacteristic_2->setCallbacks(new CharacteristicCallBack());
 
-  // Create a BLE Descriptor
-  
-  pDescr = new BLEDescriptor((uint16_t)0x2901);
-  pDescr->setValue("A very interesting variable");
-  pCharacteristic->addDescriptor(pDescr);
-  
-  pBLE2902 = new BLE2902();
-  pBLE2902->setNotifications(true);
-  
-  // Add all Descriptors here
-  pCharacteristic->addDescriptor(pBLE2902);
-  pCharacteristic_2->addDescriptor(new BLE2902());
-  
-  // After defining the desriptors, set the callback functions
-  pCharacteristic_2->setCallbacks(new CharacteristicCallBack());
-  
-  // Start the service
-  pService->start();
+    // Iniciar servicio
+    pService->start();
+    Serial.println("Servicio iniciado!");
 
-  // Start advertising
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(false);
-  pAdvertising->setMinPreferred(0x0);  // set value to 0x00 to not advertise this parameter
-  BLEDevice::startAdvertising();
-  Serial.println("Waiting a client connection to notify...");
+    // Publicar
+    NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(SERVICE_UUID);
+    pAdvertising->start();
+
+    Serial.println("Esperando conexión de cliente BLE...");
+    Serial.println("Esperando conexión de cliente BLE...");
 }
 
 void loop() {
-    // notify changed value
     if (deviceConnected) {
-        pCharacteristic->setValue(value);
+        Serial.print("Enviando notificación con valor: ");
+        Serial.println(value);
+        pCharacteristic->setValue((uint32_t)value);
         pCharacteristic->notify();
         value++;
         delay(1000);
     }
-    // disconnecting
+
+    // Si se desconecta
     if (!deviceConnected && oldDeviceConnected) {
-        delay(500); // give the bluetooth stack the chance to get things ready
-        pServer->startAdvertising(); // restart advertising
-        Serial.println("start advertising");
+        delay(500); // darle chance al stack
+        Serial.println("Reiniciando advertising...");
+        NimBLEDevice::startAdvertising();
         oldDeviceConnected = deviceConnected;
     }
-    // connecting
+
+    // Si se conecta
     if (deviceConnected && !oldDeviceConnected) {
-        // do stuff here on connecting
+        Serial.println("Nuevo cliente conectado!");
         oldDeviceConnected = deviceConnected;
     }
 }

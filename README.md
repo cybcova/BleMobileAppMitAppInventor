@@ -4,3 +4,6 @@ Source code for MIT App inventor and the ESP32 for a simple BLE controller. For 
 
 # YouTube
 https://youtu.be/dxUkr2e3rdA
+
+Probado con exito en MiA2 lite
+Fallido en MiPad 6 y galaxy s22
