@@ -35,9 +35,9 @@ class CharacteristicCallBack: public NimBLECharacteristicCallbacks {
         std::string rxValue = pChar->getValue();
         if (!rxValue.empty()) {
             String valueStr = String(rxValue.c_str());
-            int intValue = valueStr.toInt();
+            //int intValue = valueStr.toInt();
             Serial.print("Char2 escrito: ");
-            Serial.println(intValue);
+            Serial.println(valueStr);
         }
     }
 };
@@ -47,7 +47,7 @@ void setup() {
     Serial.println("Iniciando NimBLE...");
 
     // Inicializar NimBLE
-    NimBLEDevice::init("ESP32-NimBLE");
+    NimBLEDevice::init("ESP32");
     NimBLEDevice::setPower(ESP_PWR_LVL_P7); // potencia máxima
     NimBLEDevice::setSecurityAuth(true, true, true);
 
@@ -80,7 +80,6 @@ void setup() {
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->start();
 
-    Serial.println("Esperando conexión de cliente BLE...");
     Serial.println("Esperando conexión de cliente BLE...");
 }
 
