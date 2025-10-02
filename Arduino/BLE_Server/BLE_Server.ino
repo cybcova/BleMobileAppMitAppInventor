@@ -10,7 +10,7 @@
 
 const char* WIFI_SSID = "Totalplay-";
 const char* WIFI_PASS = "B5A8";
-const char* SUPA_URL  = "https://.supabase.co/rest/v1/VerificacionPrueba";
+const char* SUPA_URL  = "https://.supabase.co/rest/v1/recorrido_puntos";
 const char* SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
 
 // -----------------------------------
@@ -92,8 +92,8 @@ bool postToSupabase(String latLon) {
   http.addHeader("Authorization", String("Bearer ") + SUPA_ANON);
   http.addHeader("Prefer", "return=representation");
 
-  String payload =
-      String("{\"message\":\"") + latLon + String("\"}");
+  String payload = String("{\"camion_id\": 1, " 
+    "\"coo\":\"") + latLon + String("\"}"); 
   
   Serial.println("[JSON]: " + payload);
 
