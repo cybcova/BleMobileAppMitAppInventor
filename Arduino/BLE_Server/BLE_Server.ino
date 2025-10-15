@@ -3,10 +3,19 @@
   Ported to Arduino ESP32 by Evandro Copercini
   updated by chegewara and MoThunderz
 */
+//WIFI
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include <HTTPClient.h>
+
+//BL
 #include <NimBLEDevice.h>
+
+//RFID
+#include <SPI.h>
+#include <MFRC522.h>
+
+//Http
+#include <HTTPClient.h>
 
 const char* WIFI_SSID = "Totalplay-";
 const char* WIFI_PASS = "B5A8";
@@ -22,14 +31,35 @@ NimBLECharacteristic* pCharacteristic_2 = nullptr;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 
-uint32_t value = 0;
 volatile bool g_hasNew = false;
 String g_lastLatLon;
+
+//Tiempo Led
+const long intervaloLed = 500;  // milisegundos
+unsigned long anteriorMillisRojo = 0;
+unsigned long anteriorMillisVerde = 0;
+
+
+//Estado Led
+bool estadoVerde = false;
+bool estadoRojo = true;
+bool estadoAzul = true;
 
 // UUIDs
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHAR1_UUID          "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 #define CHAR2_UUID          "e3223119-9445-4e96-a4a1-85358c4046a2"
+
+//Leds
+#define PIN_R 25
+#define PIN_G 27
+#define PIN_B 32
+
+//RFID
+#define SS_PIN 21   // SDA
+#define RST_PIN 22  // RST
+
+MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 ///////////////////////////////////////// ---- Conexion Ble ---- ///////////////////////////////////////// 
 class MyServerCallbacks: public NimBLEServerCallbacks {
@@ -109,6 +139,20 @@ bool postToSupabase(String latLon) {
 
 void setup() {
     Serial.begin(115200);
+
+    //Leds    
+    pinMode(PIN_R, OUTPUT);
+    pinMode(PIN_G, OUTPUT);
+    pinMode(PIN_B, OUTPUT);
+    
+    digitalWrite(PIN_B, true);
+
+    //RFID
+    SPI.begin(18, 19, 23, 21);  // SCK, MISO, MOSI, SS
+    mfrc522.PCD_Init();
+    Serial.println("Acerque una tarjeta RFID...");
+
+
     Serial.println("Iniciando NimBLE...");
 
     wifiConnect();
@@ -148,10 +192,14 @@ void setup() {
     pAdvertising->start();
 
     Serial.println("Esperando conexión de cliente BLE...");
+
+
 }
 
 void loop() {
-
+  
+    unsigned long actualMillis = millis();
+  
     // Re-conexión Wi-Fi si se cayó
     static unsigned long lastWifiCheck = 0;
     if (millis() - lastWifiCheck > 5000) {
@@ -168,16 +216,11 @@ void loop() {
         g_hasNew = false;
         bool ok = postToSupabase(latLon);
         Serial.printf("[POST] %s %s\n", ok ? "OK" : "FAIL", latLon.c_str());
-    }
-    
-    // Notificaciones
-    if (deviceConnected) {
-        Serial.print("Enviando notificación con valor: ");
-        Serial.println(value);
-        pCharacteristic->setValue((uint32_t)value);
-        pCharacteristic->notify();
-        value++;
-        delay(1000);
+        
+      //Prender Led Verde
+      estadoVerde = true;
+      digitalWrite(PIN_G, estadoVerde);
+      anteriorMillisVerde = millis();
     }
 
     // Si se desconecta
@@ -193,6 +236,45 @@ void loop() {
         Serial.println("Nuevo cliente conectado!");
         oldDeviceConnected = deviceConnected;
     }
-    
+
+    //Prueba RFID
+    if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+      String uidStr = "";
+
+      // Construye el UID como cadena hexadecimal
+      for (byte i = 0; i < mfrc522.uid.size; i++) {
+        if (mfrc522.uid.uidByte[i] < 0x10) uidStr += "0";
+        uidStr += String(mfrc522.uid.uidByte[i], HEX);
+      }
+
+      uidStr.toUpperCase(); // opcional: convierte a mayúsculas
+
+      Serial.print("UID detectado: ");
+      Serial.println(uidStr);
+
+      if (deviceConnected) {
+        Serial.print("Enviando notificación con valor: ");
+        Serial.println(uidStr);
+
+        // Enviar el UID como string por BLE
+        pCharacteristic->setValue(uidStr.c_str());
+        pCharacteristic->notify();
+      }
+
+      //Prender Led Rojo
+      estadoRojo = true;
+      digitalWrite(PIN_R, estadoRojo);
+      anteriorMillisRojo = millis();
+    }
+
+    //Reset Led
+    if(estadoRojo && millis() - anteriorMillisRojo >= intervaloLed){
+      estadoRojo = false;
+      digitalWrite(PIN_R, estadoRojo);
+    }
+    if(estadoVerde && millis() - anteriorMillisVerde >= intervaloLed){
+      estadoVerde = false;
+      digitalWrite(PIN_G, estadoVerde);
+    }
     delay(200); // pequeño respiro; evita hoggear el CPU
 }
