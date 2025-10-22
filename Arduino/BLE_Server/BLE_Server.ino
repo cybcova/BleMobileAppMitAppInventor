@@ -38,11 +38,13 @@ String g_lastLatLon;
 const long intervaloLed = 500;  // milisegundos
 unsigned long anteriorMillisRojo = 0;
 unsigned long anteriorMillisVerde = 0;
+unsigned long anteriorMillisAmarillo = 0;
 
 
 //Estado Led
 bool estadoVerde = false;
-bool estadoRojo = true;
+bool estadoRojo = false;
+bool estadoAmarillo = false;
 bool estadoAzul = true;
 
 // UUIDs
@@ -51,9 +53,10 @@ bool estadoAzul = true;
 #define CHAR2_UUID          "e3223119-9445-4e96-a4a1-85358c4046a2"
 
 //Leds
-#define PIN_R 25
+#define PIN_R 26
 #define PIN_G 27
 #define PIN_B 32
+#define PIN_Y 33
 
 //RFID
 #define SS_PIN 21   // SDA
@@ -81,13 +84,19 @@ void wifiConnect() {
   Serial.print("[WiFi] Conectando");
   unsigned long t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < 20000) {
+    //digitalWrite(PIN_Y, true);
     delay(400);
     Serial.print(".");
+    //LED Yellow
+    estadoAmarillo =! estadoAmarillo;
+    digitalWrite(PIN_Y, estadoAmarillo);
   }
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("\n[WiFi] OK. IP: %s\n", WiFi.localIP().toString().c_str());
+    digitalWrite(PIN_Y, true);
   } else {
     Serial.println("\n[WiFi] No conectado (timeout). Reintentará en loop.");
+    digitalWrite(PIN_Y, false);
   }
 }
 
@@ -144,6 +153,7 @@ void setup() {
     pinMode(PIN_R, OUTPUT);
     pinMode(PIN_G, OUTPUT);
     pinMode(PIN_B, OUTPUT);
+    pinMode(PIN_Y, OUTPUT);
     
     digitalWrite(PIN_B, true);
 
@@ -203,11 +213,11 @@ void loop() {
     // Re-conexión Wi-Fi si se cayó
     static unsigned long lastWifiCheck = 0;
     if (millis() - lastWifiCheck > 5000) {
-            lastWifiCheck = millis();
-            if (WiFi.status() != WL_CONNECTED) {
-            Serial.println("[WiFi] Reintentando conexión...");
-            wifiConnect();
-        }
+      lastWifiCheck = millis();
+      if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("[WiFi] Reintentando conexión...");
+        wifiConnect();
+      }
     }
     
     // Si llegó dato BLE, postéar
