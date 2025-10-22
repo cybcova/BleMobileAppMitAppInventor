@@ -19,7 +19,7 @@
 
 const char* WIFI_SSID = "Totalplay-";
 const char* WIFI_PASS = "B5A8";
-const char* SUPA_URL  = "https://.supabase.co/rest/v1/recorrido_puntos";
+const char* SUPA_URL  = "https://.supabase.co/rest/v1/";
 const char* SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
 
 // -----------------------------------
@@ -114,14 +114,14 @@ class CharacteristicCallBack: public NimBLECharacteristicCallbacks {
 
 
 ///////////////////////////////////////// ---- POST a Supabase ---- ///////////////////////////////////////// 
-bool postToSupabase(String latLon) {
+bool postToSupabase(String endpoint, String payload) {
   if (WiFi.status() != WL_CONNECTED) return false;
 
   WiFiClientSecure client;
   client.setInsecure();
 
   HTTPClient http;
-  if (!http.begin(client, SUPA_URL)) {
+  if (!http.begin(client, SUPA_URL + endpoint)) {
     Serial.println("[HTTP] begin() falló");
     return false;
   }
@@ -130,9 +130,6 @@ bool postToSupabase(String latLon) {
   http.addHeader("apikey", SUPA_ANON);
   http.addHeader("Authorization", String("Bearer ") + SUPA_ANON);
   http.addHeader("Prefer", "return=representation");
-
-  String payload = String("{\"camion_id\": 1, " 
-    "\"coo\":\"") + latLon + String("\"}"); 
   
   Serial.println("[JSON]: " + payload);
 
@@ -224,7 +221,11 @@ void loop() {
     if (g_hasNew) {
         String latLon = g_lastLatLon;   // copia local (no volatile)
         g_hasNew = false;
-        bool ok = postToSupabase(latLon);
+         
+        String payload = String("{\"camion_id\": 1, "  
+          "\"coo\":\"") + latLon + String("\"}");
+
+        bool ok = postToSupabase("recorrido_puntos",payload);
         Serial.printf("[POST] %s %s\n", ok ? "OK" : "FAIL", latLon.c_str());
         
       //Prender Led Verde
@@ -261,6 +262,12 @@ void loop() {
 
       Serial.print("UID detectado: ");
       Serial.println(uidStr);
+      
+      // Post LatLong UID
+      String latLon = g_lastLatLon;   // copia local (no volatile)
+      String payload = String("{\"p_uid\": ") + uidStr + String(", \"p_coo\":\"") + latLon + String("\"}"); 
+      bool ok = postToSupabase("rpc/registrar_rfid", payload);
+      Serial.printf("[POST] %s %s\n", ok ? "OK" : "FAIL", latLon.c_str());
 
       if (deviceConnected) {
         Serial.print("Enviando notificación con valor: ");
