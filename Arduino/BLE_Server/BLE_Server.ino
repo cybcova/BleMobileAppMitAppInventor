@@ -17,8 +17,8 @@
 //Http
 #include <HTTPClient.h>
 
-const char* WIFI_SSID = "Totalplay-";
-const char* WIFI_PASS = "B5A8";
+const char* WIFI_SSID = "CovaPhone";
+const char* WIFI_PASS = "covacovita";
 const char* SUPA_URL  = "https://.supabase.co/rest/v1/";
 const char* SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
 
@@ -137,6 +137,12 @@ bool postToSupabase(String endpoint, String payload) {
   Serial.printf("[HTTP] POST code: %d\n", code);
   String resp = http.getString();
   Serial.println("[HTTP] Resp: " + resp);
+  
+  Serial.print("[HTTP] Con : ");
+  Serial.println(SUPA_URL + endpoint);
+  
+  Serial.print("[HTTP] payload: ");
+  Serial.println(payload);
   http.end();
 
   return code >= 200 && code < 300;
@@ -268,7 +274,7 @@ void loop() {
       
       // Post LatLong UID
       String latLon = g_lastLatLon;   // copia local (no volatile)
-      String payload = String("{\"p_uid\": ") + uidStr + String(", \"p_coo\":\"") + latLon + String("\"}"); 
+      String payload = String("{\"p_uid\": \"") + uidStr + String("\", \"p_coo\":\"") + latLon + String("\"}"); 
       bool ok = postToSupabase("rpc/registrar_rfid", payload);
       Serial.printf("[POST] %s %s\n", ok ? "OK" : "FAIL", latLon.c_str());
 
