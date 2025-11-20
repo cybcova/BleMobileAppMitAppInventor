@@ -154,6 +154,9 @@ void setup() {
     
     digitalWrite(PIN_B, true);
 
+    //Coordenadas en torre de posgrado
+    g_lastLatLon = "20.094657,-98.710274";
+
     //RFID
     SPI.begin(18, 19, 23, 21);  // SCK, MISO, MOSI, SS
     mfrc522.PCD_Init();
